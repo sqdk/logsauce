@@ -1,85 +1,125 @@
 package logsauce
 
 import (
-	"database/sql"
-	"fmt"
-	"github.com/coopernurse/gorp"
 	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"log"
+	"time"
 )
 
-var dbMap *gorp.DbMap
+var dbSession *mgo.Session
 
 func InitializeDB(config Configuration) {
-	connectionString := fmt.Sprintf("%v:%v@tcp(%v)/%v",
-		config.ServerConfiguration.DbUsername,
-		config.ServerConfiguration.DbPassword,
-		config.ServerConfiguration.DbAddress,
-		config.ServerConfiguration.DbName)
-
-	log.Println(connectionString)
-
-	dbConnection, err := sql.Open("mysql", connectionString)
+	session, err := mgo.Dial(config.ServerConfiguration.DbAddress)
 	if err != nil {
-		log.Panicln(err)
+		log.Panic(err)
 	}
 
-	dbM := &gorp.DbMap{Db: dbConnection, Dialect: gorp.MySQLDialect{Engine: "InnoDB", Encoding: "utf8"}}
-
-	dbM.AddTableWithName(Host{}, "hosts").SetKeys(true, "Id")
-	dbM.AddTableWithName(LogLine{}, "loglines").SetKeys(true, "Id")
-
-	err = dbM.CreateTablesIfNotExists()
+	err = session.Login(&mgo.Credential{Username: config.ServerConfiguration.DbUsername, Password: config.ServerConfiguration.DbPassword})
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
-	dbMap = dbM
+	/*idIndex := mgo.Index{
+		Key:    []string{"Id"},
+		Unique: true,
+		Sparse: true,
+	}*/
+
+	nameIndex := mgo.Index{
+		Key:    []string{"Name"},
+		Unique: true,
+		Sparse: true,
+	}
+
+	//Configure hosts collection
+	/*err = session.DB("logsauce").C("hosts").EnsureIndex(idIndex)
+	if err != nil {
+		log.Panic(err)
+	}*/
+
+	err = session.DB("logsauce").C("hosts").EnsureIndex(nameIndex)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	for i := 0; i < len(config.ServerConfiguration.Hosts); i++ {
+		err := session.DB("logsauce").C("hosts").Insert(config.ServerConfiguration.Hosts[i])
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	//Configure logs collection
+	/*err = session.DB("logsauce").C("logs").EnsureIndex(idIndex)
+	if err != nil {
+		log.Panic(err)
+	}*/
+
+	//Configure logtypes collection
+	/*err = session.DB("logsauce").C("logtypes").EnsureIndex(idIndex)
+	if err != nil {
+		log.Panic(err)
+	}*/
+
+	err = session.DB("logsauce").C("logtypes").EnsureIndex(nameIndex)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	dbSession = session
 }
 
-func getDbMap() *gorp.DbMap {
-	return dbMap
+func getHostsCollection() *mgo.Collection {
+	if err := dbSession.Ping(); err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return dbSession.DB("logsauce").C("hosts")
 }
 
-func getAllHosts() ([]Host, error) {
-	dbMap := getDbMap()
+func getLogCollection() *mgo.Collection {
+	if err := dbSession.Ping(); err != nil {
+		log.Println(err)
+		return nil
+	}
 
-	var hosts []Host
-	_, err := dbMap.Select(&hosts, "SELECT * FROM hosts")
+	return dbSession.DB("logsauce").C("logs")
+}
+
+func getLogTypeCollection() *mgo.Collection {
+	if err := dbSession.Ping(); err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return dbSession.DB("logsauce").C("logtypes")
+}
+
+func insertLogline(logline LogLine) {
+	logCollection := getLogCollection()
+
+	logline.Id = bson.NewObjectId()
+	logline.Timestamp = time.Now().Unix()
+
+	err := logCollection.Insert(logline)
 	if err != nil {
 		log.Println(err)
-		return hosts, err
 	}
-
-	return hosts, nil
 }
 
-func insertLogline(logline LogLine) error {
-	dbMap := getDbMap()
-	err := dbMap.Insert(&logline)
-	return err
-}
+func getHostWithToken(token string) (Host, error) {
+	hostCollection := getHostsCollection()
 
-func getLoglinesForHost(hostId int64) {
-	var lines []LogLine
-	dbMap := getDbMap()
-	_, err := dbMap.Select(&lines, "SELECT * FROM loglines WHERE HostId = ?", hostId)
+	var host Host
+
+	err := hostCollection.Find(bson.M{"Token": token}).One(&host)
 	if err != nil {
 		log.Println(err)
-		return lines, err
+		return Host{}, err
 	}
 
-	return lines, nil
-}
-
-func getLoglinesForFileForHost(hostId int64, filepath string) {
-	var lines []LogLine
-	dbMap := getDbMap()
-	_, err := dbMap.Select(&lines, "SELECT * FROM loglines WHERE HostId = ? AND Filepath = ?", hostId, filepath)
-	if err != nil {
-		log.Println(err)
-		return lines, err
-	}
-
-	return lines, nil
+	return host, nil
 }

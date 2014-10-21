@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 func init() {
@@ -16,20 +15,26 @@ func init() {
 }
 
 func RegisterRoutes(config Configuration) {
+	log.Println("Server mode is active")
 	r := mux.NewRouter()
+	log.Println("Server mode is active")
 	port := strconv.Itoa(config.ListenPort)
+	log.Println(port)
 
 	if config.ServerMode {
+		log.Println("Server mode is active")
+
 		r.HandleFunc("/", serverHandler).Methods("POST")
+
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go log.Fatal(http.ListenAndServe("0.0.0.0:"+port, r))
-
+		log.Println("Server mode is active")
 	} else if config.Relaymode {
 		r.HandleFunc("/", relayHandler).Methods("POST")
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go log.Fatal(http.ListenAndServe("0.0.0.0:"+port, r))
+		log.Println("Relay mode is active")
 	}
-
 }
 
 func serverHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,9 +59,8 @@ func serverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newLogline.HostId = host.Id
-	newLogline.Timestamp = time.Now().Unix()
 
-	err = insertLogline(newLogline)
+	insertLogline(newLogline)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -82,25 +86,14 @@ func verifyToken(w http.ResponseWriter, r *http.Request) (Host, error) {
 	}
 
 	//Verify token
-	hosts, err := getAllHosts()
+	host, err := getHostWithToken(token[0])
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return currentHost, err
+		return Host{}, err
 	}
 
-	for i := 0; i < len(hosts); i++ {
-		if hosts[i].Token == token[0] {
-			currentHost = hosts[i]
-			break
-		}
-
-		if i == len(hosts) {
-			log.Println("Unknown host token")
-			w.WriteHeader(http.StatusInternalServerError)
-			return currentHost, errors.New("Unknown host token")
-		}
-	}
+	currentHost = host
 
 	return currentHost, nil
 }

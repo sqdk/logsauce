@@ -8,7 +8,7 @@ import (
 func main() {
 	config, _ := logsauce.ReadConfig("./server.conf")
 
-	logsauce.InitializeDB(config)
+	//logsauce.InitializeDB(config)
 	logsauce.RegisterRoutes(config)
 	fmt.Println("Starting server")
 

@@ -19,6 +19,7 @@ type Configuration struct {
 		DbPassword           string `json:"db_password"`
 		ServerCertificate    string `json:"server_cert"`
 		ServerCertificateKey string `json:"server_key"`
+		Hosts                []Host `json:"hosts"`
 	} `json:"server_config"`
 
 	ClientConfiguration struct {
