@@ -15,24 +15,19 @@ func init() {
 }
 
 func RegisterRoutes(config Configuration) {
-	log.Println("Server mode is active")
 	r := mux.NewRouter()
-	log.Println("Server mode is active")
 	port := strconv.Itoa(config.ListenPort)
-	log.Println(port)
 
 	if config.ServerMode {
-		log.Println("Server mode is active")
-
 		r.HandleFunc("/", serverHandler).Methods("POST")
 
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
-		go log.Fatal(http.ListenAndServe("0.0.0.0:"+port, r))
+		go http.ListenAndServe("127.0.0.1:"+port, r)
 		log.Println("Server mode is active")
 	} else if config.Relaymode {
 		r.HandleFunc("/", relayHandler).Methods("POST")
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
-		go log.Fatal(http.ListenAndServe("0.0.0.0:"+port, r))
+		go http.ListenAndServe("0.0.0.0:"+port, r)
 		log.Println("Relay mode is active")
 	}
 }
@@ -79,18 +74,16 @@ func verifyToken(w http.ResponseWriter, r *http.Request) (Host, error) {
 	var currentHost Host
 
 	token := r.Header["Token"] //Check if header is present
-	log.Println(r.Header)
 	if len(token) == 0 {
 		w.WriteHeader(http.StatusForbidden)
-		return currentHost, errors.New("No token")
+		return Host{}, errors.New("No token")
 	}
 
 	//Verify token
 	host, err := getHostWithToken(token[0])
 	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return Host{}, err
+		w.WriteHeader(http.StatusForbidden)
+		return Host{}, errors.New("Unknown token")
 	}
 
 	currentHost = host

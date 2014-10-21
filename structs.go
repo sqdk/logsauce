@@ -6,11 +6,11 @@ import (
 )
 
 type LogLine struct {
-	Id            bson.ObjectId
+	Id            bson.ObjectId `bson:"_id,omitempty"`
 	Line          string
 	Timestamp     int64
-	HostId        bson.ObjectId
-	TypeId        bson.ObjectId
+	HostId        bson.ObjectId `bson:",omitempty"`
+	TypeId        bson.ObjectId `bson:",omitempty"`
 	Filename      string
 	Filepath      string
 	Alias         string
@@ -23,7 +23,7 @@ func (l *LogLine) UpdateTokenizedLineTransactional(transaction gorp.Transaction,
 }
 
 type LogType struct {
-	Id          bson.ObjectId
+	Id          bson.ObjectId `bson:"_id"`
 	Name        string
 	Description string
 	Pattern     string
@@ -31,7 +31,7 @@ type LogType struct {
 }
 
 type Host struct {
-	Id    bson.ObjectId
+	Id    bson.ObjectId `bson:"_id"`
 	Token string
 	Name  string
 }

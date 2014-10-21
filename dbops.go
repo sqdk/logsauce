@@ -101,10 +101,12 @@ func getLogTypeCollection() *mgo.Collection {
 func insertLogline(logline LogLine) {
 	logCollection := getLogCollection()
 
-	logline.Id = bson.NewObjectId()
+	//logline.Id = bson.NewObjectId()
 	logline.Timestamp = time.Now().Unix()
 
-	err := logCollection.Insert(logline)
+	log.Println(logline)
+
+	err := logCollection.Insert(&logline)
 	if err != nil {
 		log.Println(err)
 	}
@@ -117,7 +119,6 @@ func getHostWithToken(token string) (Host, error) {
 
 	err := hostCollection.Find(bson.M{"Token": token}).One(&host)
 	if err != nil {
-		log.Println(err)
 		return Host{}, err
 	}
 
