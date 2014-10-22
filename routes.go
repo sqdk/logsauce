@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func init() {
@@ -20,6 +21,7 @@ func RegisterRoutes(config Configuration) {
 
 	if config.ServerMode {
 		r.HandleFunc("/", serverHandler).Methods("POST")
+		r.HandleFunc("/logs/{hostname}/{filepath}/{starttime}/{endtime}", getLogsHandler).Methods("GET")
 
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go http.ListenAndServe("127.0.0.1:"+port, r)
@@ -30,6 +32,50 @@ func RegisterRoutes(config Configuration) {
 		go http.ListenAndServe("0.0.0.0:"+port, r)
 		log.Println("Relay mode is active")
 	}
+}
+
+/*
+Restricted route. needs login or a client token
+Slashes in filepath is replaced with +.
+*/
+func getLogsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	if vars["hostname"] == "" || vars["filepath"] == "" || vars["starttime"] == "" || vars["endtime"] == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	startTime, err := strconv.Atoi(vars["starttime"])
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	endTime, err := strconv.Atoi(vars["endtime"])
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	parsedFilepath := strings.Replace(vars["filepath"], "+", "/", -1)
+	log.Println(parsedFilepath)
+	logs, err := getLoglinesForPeriodForHostnameAndFilepath(vars["hostname"], parsedFilepath, int64(startTime), int64(endTime))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	b, err := json.Marshal(&logs)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(b)
+	return
 }
 
 func serverHandler(w http.ResponseWriter, r *http.Request) {

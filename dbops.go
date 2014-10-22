@@ -101,7 +101,6 @@ func getLogTypeCollection() *mgo.Collection {
 func insertLogline(logline LogLine) {
 	logCollection := getLogCollection()
 
-	//logline.Id = bson.NewObjectId()
 	logline.Timestamp = time.Now().Unix()
 
 	log.Println(logline)
@@ -112,12 +111,55 @@ func insertLogline(logline LogLine) {
 	}
 }
 
+func getLoglinesForPeriodForHostnameAndFilepath(hostname, filepath string, startUnix, endUnix int64) ([]LogLine, error) {
+	host, err := getHostWithName(hostname)
+	if err != nil {
+		return []LogLine{}, err
+	}
+
+	logCollection := getLogCollection()
+	var loglines []LogLine
+	//err = logCollection.Find(bson.M{"HostId": host.Id, "Filepath": filepath, "Timestamp": bson.M{"$gte": startUnix, "$lte": endUnix}}).All(&loglines)
+	err = logCollection.Find(bson.M{"hostid": host.Id, "filepath": filepath, "timestamp": bson.M{"$gte": startUnix, "$lte": endUnix}}).All(&loglines)
+	if err != nil {
+		return []LogLine{}, err
+	}
+
+	return loglines, nil
+}
+
 func getHostWithToken(token string) (Host, error) {
 	hostCollection := getHostsCollection()
 
 	var host Host
 
 	err := hostCollection.Find(bson.M{"Token": token}).One(&host)
+	if err != nil {
+		return Host{}, err
+	}
+
+	return host, nil
+}
+
+func getHostWithId(id bson.ObjectId) (Host, error) {
+	hostCollection := getHostsCollection()
+
+	var host Host
+
+	err := hostCollection.FindId(id).One(&host)
+	if err != nil {
+		return Host{}, err
+	}
+
+	return host, nil
+}
+
+func getHostWithName(name string) (Host, error) {
+	hostCollection := getHostsCollection()
+
+	var host Host
+
+	err := hostCollection.Find(bson.M{"Name": name}).One(&host)
 	if err != nil {
 		return Host{}, err
 	}
