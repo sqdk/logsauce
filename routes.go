@@ -15,18 +15,18 @@ func init() {
 
 }
 
-func RegisterRoutes(config Configuration) {
+func RegisterRoutes(listenPort int, relayMode, serverMode bool) {
 	r := mux.NewRouter()
-	port := strconv.Itoa(config.ListenPort)
+	port := strconv.Itoa(listenPort)
 
-	if config.ServerMode {
-		r.HandleFunc("/", serverHandler).Methods("POST")
+	if serverMode {
+		r.HandleFunc("/logs", serverHandler).Methods("POST")
 		r.HandleFunc("/logs/{hostname}/{filepath}/{starttime}/{endtime}", getLogsHandler).Methods("GET")
 
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go http.ListenAndServe("127.0.0.1:"+port, r)
 		log.Println("Server mode is active")
-	} else if config.Relaymode {
+	} else if relayMode {
 		r.HandleFunc("/", relayHandler).Methods("POST")
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go http.ListenAndServe("0.0.0.0:"+port, r)
