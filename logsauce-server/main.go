@@ -13,6 +13,5 @@ func main() {
 	fmt.Println("Starting server")
 
 	looper := make(chan int)
-
 	<-looper
 }

@@ -24,7 +24,7 @@ func RegisterRoutes(listenPort int, relayMode, serverMode bool) {
 		r.HandleFunc("/logs/{hostname}/{filepath}/{starttime}/{endtime}", getLogsHandler).Methods("GET")
 
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
-		go http.ListenAndServe("127.0.0.1:"+port, r)
+		go http.ListenAndServe("0.0.0.0:"+port, r)
 		log.Println("Server mode is active")
 	} else if relayMode {
 		r.HandleFunc("/", relayHandler).Methods("POST")
