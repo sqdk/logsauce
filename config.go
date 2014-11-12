@@ -26,6 +26,7 @@ type Configuration struct {
 		ServerAddress     string   `json:"server_address"`
 		FilesToWatch      []string `json:"files_to_watch"`
 		ServerCertificate string   `json:"server_cert"`
+		ClientToken       string   `json:"token"`
 	} `json:"client_config"`
 }
 
