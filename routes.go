@@ -22,7 +22,7 @@ func RegisterRoutes(listenPort int, relayMode, serverMode bool) {
 	if serverMode {
 		r.HandleFunc("/logs", serverHandler).Methods("POST")
 		r.HandleFunc("/logs/{hostname}/{filepath}/{starttime}/{endtime}", getLogsHandler).Methods("GET")
-		r.HandleFunc("/compute", computeHandler).Methods("POST")
+		r.HandleFunc("/compute", addDefaultHeaders(computeHandler)).Methods("POST")
 		//go http.ListenAndServeTLS(":"+string(config.ListenPort), config.ServerConfiguration.ServerCertificate, config.ServerConfiguration.ServerCertificateKey, r)
 		go http.ListenAndServe("0.0.0.0:"+port, r)
 		log.Println("Server mode is active")
@@ -53,49 +53,75 @@ func computeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println(computeRequest)
+	log.Printf("%#v", computeRequest)
+
+	if computeRequest.TimeStart <= 0 && computeRequest.TimeEnd <= 0 {
+		log.Println("Bad timestart or end")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	switch computeRequest.Operation {
 	case "dist":
 		{
-			if computeRequest.TimeStart != 0 && computeRequest.TimeEnd != 0 {
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-
-				resolution, err := strconv.Atoi(computeRequest.Parameter1)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-
-				fieldNames := strings.Split(computeRequest.Parameter2, ",")
-				log.Println(fieldNames, resolution)
-
-				var responses []ComputeResponse
-				for i := 0; i < len(fieldNames); i++ {
-					newResponses := calcDistributionOverTimeUnsortedInput(computeRequest.LogtypeName, computeRequest.Host, computeRequest.Filename, resolution, fieldNames[i], computeRequest.TimeStart, computeRequest.TimeEnd)
-					for i := 0; i < len(newResponses); i++ {
-						responses = append(responses, newResponses[i])
-					}
-				}
-
-				b, err := json.Marshal(&responses)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				w.Write(b)
-				return
-			} else {
+			resolution, err := strconv.Atoi(computeRequest.Parameter1)
+			if err != nil {
+				log.Println(err)
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+
+			fieldNames := strings.Split(computeRequest.Parameter2, ",")
+			log.Println(fieldNames, resolution)
+
+			var responses []ComputeResponse
+			for i := 0; i < len(fieldNames); i++ {
+				newResponses := calcDistributionOverTime(computeRequest.LogtypeName, computeRequest.Host, computeRequest.Filename, resolution, fieldNames[i], computeRequest.TimeStart, computeRequest.TimeEnd)
+				for i := 0; i < len(newResponses); i++ {
+					responses = append(responses, newResponses[i])
+				}
+			}
+
+			b, err := json.Marshal(&responses)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(b)
+			return
+		}
+
+	case "uniq":
+		{
+			resolution, err := strconv.Atoi(computeRequest.Parameter1)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			fieldNames := strings.Split(computeRequest.Parameter2, ",")
+			log.Println(fieldNames, resolution)
+
+			var responses []ComputeResponse
+			for i := 0; i < len(fieldNames); i++ {
+				newResponses := countUniqueOverTime(computeRequest.LogtypeName, computeRequest.Host, computeRequest.Filename, resolution, fieldNames[i], computeRequest.TimeStart, computeRequest.TimeEnd)
+				for i := 0; i < len(newResponses); i++ {
+					responses = append(responses, newResponses[i])
+				}
+			}
+
+			b, err := json.Marshal(&responses)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(b)
+			return
 		}
 	}
 }
@@ -201,4 +227,16 @@ func verifyToken(w http.ResponseWriter, r *http.Request) (Host, error) {
 	currentHost = host
 
 	return currentHost, nil
+}
+
+func addDefaultHeaders(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		fn(w, r)
+	}
 }

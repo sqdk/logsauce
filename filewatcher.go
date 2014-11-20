@@ -3,15 +3,49 @@ package logsauce
 import (
 	"bufio"
 	"code.google.com/p/go.exp/fsnotify"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
 func WatchFiles(filesToWatch []string, loadExistingData bool, serverAddress, clientToken string) {
-	fileIndex := make(map[string]int64)
+	executionDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b, err := ioutil.ReadFile(executionDir + "datawatch.state")
+	var fileIndex map[string]int64
+
+	if err != nil {
+		fileIndex = make(map[string]int64)
+	} else {
+		err := json.Unmarshal(b, &fileIndex)
+		if err != nil {
+			log.Fatal("State information corrupt. Delete datawatch.state file or repair")
+		}
+	}
+
+	ticker := time.NewTicker(time.Second * 1)
+	go func(fileIndexes *map[string]int64) {
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("Writing state")
+				b, _ := json.Marshal(fileIndex)
+				err = ioutil.WriteFile(executionDir+"datawatch.state", b, 0644)
+				if err != nil {
+					log.Println("Unable to write state information to disk")
+				}
+			}
+		}
+
+		println("Timer expired")
+	}(&fileIndex)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -48,7 +82,15 @@ func WatchFiles(filesToWatch []string, loadExistingData bool, serverAddress, cli
 	}
 
 	log.Println("Watching")
-	go func() {
+
+	type KV struct {
+		K string
+		V int64
+	}
+
+	filechangeschan := make(chan *KV)
+
+	go func(fileChangesChannel chan *KV) {
 		for {
 			select {
 			case ev := <-watcher.Event:
@@ -104,7 +146,14 @@ func WatchFiles(filesToWatch []string, loadExistingData bool, serverAddress, cli
 				log.Println("error:", err)
 			}
 		}
-	}()
+	}(filechangeschan)
+
+	for {
+		select {
+		case <-filechangeschan:
+
+		}
+	}
 
 	looper := make(chan int)
 	<-looper

@@ -177,8 +177,10 @@ func getTokenizedDataForHostnameAndFilepath(patternName, hostname, filepath stri
 		changed := false
 		if len(loglines[i].TokenizedObject) == 0 {
 			data := samurai.TokenizeBlock(loglines[i].Line, lt.Pattern)
-			loglines[i].TokenizedObject = data
-			changed = true
+			if data != nil {
+				loglines[i].TokenizedObject = data
+				changed = true
+			}
 		}
 
 		if loglines[i].DataTimestamp <= 0 {
